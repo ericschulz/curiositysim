@@ -41,18 +41,19 @@ tau<-0.001
 lambda<-1
 #UCB exploration bonus
 beta<-3
+#how many runs for each simulations
+nruns<-10000
+#how many trials per run
+ntrials<-10
 
 
 ##########################################################################
 #SIMULATION FOR NOVELTY HEURISTIC
 ##########################################################################
-#initialize data frame to collect performance at test
-dperformance<-data.frame(run=numeric(), sampling=numeric(), performance=numeric())
 #initialize data frame to collect which options are chosen during learning
-drank<-data.frame(run=numeric(), ranks=numeric())
-
+dranknovel<-data.frame(run=1:nruns, ranks=rep(0, nruns))
 #Let's get the party started with 1000 runs
-for (nrun in 1:10000){
+for (nrun in 1:nruns){
   #we sample a target function from the GP with mean function 0
   target<-mvrnorm(1, rep(0, length(x.star)), sigma)
   #first observation is randomly sampled
@@ -62,9 +63,9 @@ for (nrun in 1:10000){
   #initialize the data frame to track the actual observations
   datobserve<-data.frame(x=xnew, y=ynew)
   #initialize vector to track sampled confidence rank
-  trackrank<-numeric()
+  trackrank<-rep(0, ntrials)
   #for 10 trials in total, we'll be sampling!
-  for (trials in 1:10){
+  for (trials in 1:ntrials){
     #x observations for GP
     x <- datobserve$x
     #k_xx matrix (this is also described in our GP tutorial)
@@ -92,25 +93,20 @@ for (nrun in 1:10000){
     #concatenate the new observations to the old ones
     datobserve<-rbind(datobserve, data.frame(x=xnew, y=ynew))
     #collect the tracked confidence ranks, we want less confidence to have lower ranks and we also break ties randomly
-    trackrank<-c(trackrank, rank(-diag(cov.f.star), ties.method = "min")[x.star==xnew])
+    trackrank[trials]<-rank(-diag(cov.f.star), ties.method = "min")[x.star==xnew]
   }
-drank<-rbind(drank, data.frame(run=nrun, ranks=mean(trackrank)))
+  dranknovel$ranks[nrun]<-mean(trackrank)
   cat(paste("Run", nrun, "is done.\n"))
 }
-dranknovel<-drank
-dperfnovel<-dperformance
 
 
 ##########################################################################
 #SIMULATION FOR UPPER CONFIDENCE BOUND SAMPLER
 ##########################################################################
-#initialize data frame to collect performance at test
-dperformance<-data.frame(run=numeric(), sampling=numeric(), performance=numeric())
 #initialize data frame to collect which options are chosen during learning
-drank<-data.frame(run=numeric(), ranks=numeric())
+drankucb<-data.frame(run=1:nruns, ranks=rep(0, nruns))
 #Let's get the party started with 1000 runs
-for (nrun in 1:10000){
-  
+for (nrun in 1:nruns){
   #we sample a target function from the GP with mean function 0
   target<-mvrnorm(1, rep(0, length(x.star)), sigma)
   #first observation is randomly sampled
@@ -120,9 +116,9 @@ for (nrun in 1:10000){
   #initialize the data frame to track the actual observations
   datobserve<-data.frame(x=xnew, y=ynew)
   #initialize vector to track sampled confidence rank
-  trackrank<-numeric()
+  trackrank<-rep(0, ntrials)
   #for 10 trials in total, we'll be sampling!
-  for (trials in 1:10){
+  for (trials in 1:ntrials){
     #x observations for GP
     x <- datobserve$x
     #k_xx matrix (this is also described in our GP tutorial)
@@ -150,25 +146,20 @@ for (nrun in 1:10000){
     #concatenate the new observations to the old ones
     datobserve<-rbind(datobserve, data.frame(x=xnew, y=ynew))
     #collect the tracked confidence ranks, we want less confidence to have lower ranks and we also break ties randomly
-    trackrank<-c(trackrank, rank(-diag(cov.f.star), ties.method = "min")[x.star==xnew])
+    trackrank[trials]<-rank(-diag(cov.f.star), ties.method = "min")[x.star==xnew]
   }
-  drank<-rbind(drank, data.frame(run=nrun, ranks=mean(trackrank)))
+  drankucb$ranks[nrun]<-mean(trackrank)
   cat(paste("Run", nrun, "is done.\n"))
 }
-
-drankucb<-drank
 
 
 ##########################################################################
 #SIMULATION FOR COMPLEXITY APPROXIMATION
 ##########################################################################
-#initialize data frame to collect performance at test
-dperformance<-data.frame(run=numeric(), sampling=numeric(), performance=numeric())
 #initialize data frame to collect which options are chosen during learning
-drank<-data.frame(run=numeric(), ranks=numeric())
+drankcomplex<-data.frame(run=1:nruns, ranks=rep(0, nruns))
 #Let's get the party started with 1000 runs
-for (nrun in 1:10000){
-  
+for (nrun in 1:nruns){
   #we sample a target function from the GP with mean function 0
   target<-mvrnorm(1, rep(0, length(x.star)), sigma)
   #first observation is randomly sampled
@@ -178,9 +169,9 @@ for (nrun in 1:10000){
   #initialize the data frame to track the actual observations
   datobserve<-data.frame(x=xnew, y=ynew)
   #initialize vector to track sampled confidence rank
-  trackrank<-numeric()
+  trackrank<-rep(0, ntrials)
   #for 10 trials in total, we'll be sampling!
-  for (trials in 1:10){
+  for (trials in 1:ntrials){
     #x observations for GP
     x <- datobserve$x
     #k_xx matrix (this is also described in our GP tutorial)
@@ -230,13 +221,12 @@ for (nrun in 1:10000){
     #concatenate the new observations to the old ones
     datobserve<-rbind(datobserve, data.frame(x=xnew, y=ynew))
     #collect the tracked confidence ranks, we want less confidence to have lower ranks and we also break ties randomly
-    trackrank<-c(trackrank, rank(-diag(cov.f.star), ties.method = "min")[x.star==xnew])
+    trackrank[trials]<-rank(-diag(cov.f.star), ties.method = "min")[x.star==xnew]
   }
-  drank<-rbind(drank, data.frame(run=nrun, ranks=mean(trackrank)))
+  drankcomplex$ranks[nrun]<-mean(trackrank)
   cat(paste("Run", nrun, "is done.\n"))
 }
-drankcomplex<-drank
-dperfcomplex<-dperformance
+
 
 ##########################################################################
 #DENSITY HISTOGRAMS OF SAMPLED MEAN RANKS
