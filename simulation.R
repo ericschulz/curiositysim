@@ -1,3 +1,6 @@
+##########################################################################
+#PREAMBLE
+##########################################################################
 #house keeping
 rm(list=ls())
 
@@ -23,28 +26,39 @@ calcSigma <- function(X1,X2,l=1) {
   return(Sigma)
 }
 
-
-#initialize data frame to collect performance at test
-dperformance<-data.frame(run=numeric(), sampling=numeric(), performance=numeric())
-#initialize data frame to collect which options are chosen during learning
-drank<-data.frame(run=numeric(), ranks=numeric())
-
+##########################################################################
+#ALL SET PARAMETERS
+##########################################################################
 #the observation noise is 0.1
 sigma.n <- 0.1
 #we do inference over 20 equally space option in 1D
 x.star <- seq(-5,5,len=20)
 #pre-calculate Gram matrix
 sigma <- calcSigma(x.star,x.star)
+#softmax tau
+tau<-0.001
+#function's smoothness
+lambda<-1
+#UCB exploration bonus
+beta<-3
+
+
+##########################################################################
+#SIMULATION FOR NOVELTY HEURISTIC
+##########################################################################
+#initialize data frame to collect performance at test
+dperformance<-data.frame(run=numeric(), sampling=numeric(), performance=numeric())
+#initialize data frame to collect which options are chosen during learning
+drank<-data.frame(run=numeric(), ranks=numeric())
 
 #Let's get the party started with 1000 runs
 for (nrun in 1:10000){
-  
   #we sample a target function from the GP with mean function 0
   target<-mvrnorm(1, rep(0, length(x.star)), sigma)
   #first observation is randomly sampled
   xnew<-sample(x.star)[1]
   #output for sampled option
-  ynew<-target[x.star==xnew]+rnorm(1, 0, 0.1)
+  ynew<-target[x.star==xnew]+rnorm(1, 0, sigma.n)
   #initialize the data frame to track the actual observations
   datobserve<-data.frame(x=xnew, y=ynew)
   #initialize vector to track sampled confidence rank
@@ -70,7 +84,7 @@ for (nrun in 1:10000){
     #for utility, subtract max to avoid overflow
     util<-sig-max(sig)
     #softmax of probabilities
-    prob<-exp(util/0.001)/sum(exp(util/0.001))
+    prob<-exp(util/tau)/sum(exp(util/tau))
     #sample a new observation proportionally to the softmax probs
     xnew<-sample(x.star, 1, prob=prob)
     #get an ouptut plus observation noise
@@ -80,44 +94,20 @@ for (nrun in 1:10000){
     #collect the tracked confidence ranks, we want less confidence to have lower ranks and we also break ties randomly
     trackrank<-c(trackrank, rank(-diag(cov.f.star), ties.method = "min")[x.star==xnew])
   }
-  #randomly sample test set
-  indrand<-sample(1:20, 5)
-  #get performance of random test set
-  perfrand<-sum((f.bar.star[indrand]-target[indrand])^2)
-  
-  #sample randomly from observed set, this is like proportional sampling
-  indprop<-sample(datobserve$x, 5)
-  #initialize performance vector
-  perf<-rep(0, 5)
-  #loop through (i know this is computationally lame...)
-  for (k in 1:5){
-    #get performance of proportional tes set
-    perf[k]<-(f.bar.star[indprop[k]==x.star]-target[indprop[k]==x.star])^2
-  }
-  perfprop<-sum(perf)
-  #concatenate performance and rank data frames
-  dperformance<-rbind(dperformance, data.frame(run=rep(nrun, 2), sampling=c("Random", "Proportional"), performance=c(perfrand, perfprop)))
-  drank<-rbind(drank, data.frame(run=nrun, ranks=mean(trackrank)))
+drank<-rbind(drank, data.frame(run=nrun, ranks=mean(trackrank)))
   cat(paste("Run", nrun, "is done.\n"))
 }
-
 dranknovel<-drank
 dperfnovel<-dperformance
 
 
-
+##########################################################################
+#SIMULATION FOR UPPER CONFIDENCE BOUND SAMPLER
+##########################################################################
 #initialize data frame to collect performance at test
 dperformance<-data.frame(run=numeric(), sampling=numeric(), performance=numeric())
 #initialize data frame to collect which options are chosen during learning
 drank<-data.frame(run=numeric(), ranks=numeric())
-
-#the observation noise is 0.1
-sigma.n <- 0.1
-#we do inference over 20 equally space option in 1D
-x.star <- seq(-5,5,len=20)
-#pre-calculate Gram matrix
-sigma <- calcSigma(x.star,x.star)
-
 #Let's get the party started with 1000 runs
 for (nrun in 1:10000){
   
@@ -126,7 +116,7 @@ for (nrun in 1:10000){
   #first observation is randomly sampled
   xnew<-sample(x.star)[1]
   #output for sampled option
-  ynew<-target[x.star==xnew]+rnorm(1, 0, 0.1)
+  ynew<-target[x.star==xnew]+rnorm(1, 0, sigma.n)
   #initialize the data frame to track the actual observations
   datobserve<-data.frame(x=xnew, y=ynew)
   #initialize vector to track sampled confidence rank
@@ -148,11 +138,11 @@ for (nrun in 1:10000){
     #posterior covariance matrix of the GP
     cov.f.star <- k.xsxs - k.xsx%*%solve(k.xx + sigma.n^2*diag(1, ncol(k.xx)))%*%k.xxs
     #get predictive standard deviations
-    ucb<-f.bar.star+3*sqrt(diag(cov.f.star))
+    ucb<-f.bar.star+beta*sqrt(diag(cov.f.star))
     #for utility, subtract max to avoid overflow
     util<-ucb-max(ucb)
     #softmax of probabilities
-    prob<-exp(util/0.001)/sum(exp(util/0.001))
+    prob<-exp(util/tau)/sum(exp(util/tau))
     #sample a new observation proportionally to the softmax probs
     xnew<-sample(x.star, 1, prob=prob)
     #get an ouptut plus observation noise
@@ -162,44 +152,20 @@ for (nrun in 1:10000){
     #collect the tracked confidence ranks, we want less confidence to have lower ranks and we also break ties randomly
     trackrank<-c(trackrank, rank(-diag(cov.f.star), ties.method = "min")[x.star==xnew])
   }
-  #randomly sample test set
-  indrand<-sample(1:20, 5)
-  #get performance of random test set
-  perfrand<-sum((f.bar.star[indrand]-target[indrand])^2)
-  
-  #sample randomly from observed set, this is like proportional sampling
-  indprop<-sample(datobserve$x, 5)
-  #initialize performance vector
-  perf<-rep(0, 5)
-  #loop through (i know this is computationally lame...)
-  for (k in 1:5){
-    #get performance of proportional tes set
-    perf[k]<-(f.bar.star[indprop[k]==x.star]-target[indprop[k]==x.star])^2
-  }
-  perfprop<-sum(perf)
-  #concatenate performance and rank data frames
-  dperformance<-rbind(dperformance, data.frame(run=rep(nrun, 2), sampling=c("Random", "Proportional"), performance=c(perfrand, perfprop)))
   drank<-rbind(drank, data.frame(run=nrun, ranks=mean(trackrank)))
   cat(paste("Run", nrun, "is done.\n"))
 }
 
 drankucb<-drank
-dperfucb<-dperformance
 
 
-
+##########################################################################
+#SIMULATION FOR COMPLEXITY APPROXIMATION
+##########################################################################
 #initialize data frame to collect performance at test
 dperformance<-data.frame(run=numeric(), sampling=numeric(), performance=numeric())
 #initialize data frame to collect which options are chosen during learning
 drank<-data.frame(run=numeric(), ranks=numeric())
-
-#the observation noise is 0.1
-sigma.n <- 0.1
-#we do inference over 20 equally space option in 1D
-x.star <- seq(-5,5,len=20)
-#pre-calculate Gram matrix
-sigma <- calcSigma(x.star,x.star)
-
 #Let's get the party started with 1000 runs
 for (nrun in 1:10000){
   
@@ -208,7 +174,7 @@ for (nrun in 1:10000){
   #first observation is randomly sampled
   xnew<-sample(x.star)[1]
   #output for sampled option
-  ynew<-target[x.star==xnew]+rnorm(1, 0, 0.1)
+  ynew<-target[x.star==xnew]+rnorm(1, 0, sigma.n)
   #initialize the data frame to track the actual observations
   datobserve<-data.frame(x=xnew, y=ynew)
   #initialize vector to track sampled confidence rank
@@ -256,7 +222,7 @@ for (nrun in 1:10000){
     #for utility, subtract max to avoid overflow
     util<-util-max(util)
     #softmax of probabilities
-    prob<-exp(util/0.001)/sum(exp(util/0.001))
+    prob<-exp(util/tau)/sum(exp(util/tau))
     #sample a new observation proportionally to the softmax probs
     xnew<-sample(x.star, 1, prob=prob)
     #get an ouptut plus observation noise
@@ -266,32 +232,15 @@ for (nrun in 1:10000){
     #collect the tracked confidence ranks, we want less confidence to have lower ranks and we also break ties randomly
     trackrank<-c(trackrank, rank(-diag(cov.f.star), ties.method = "min")[x.star==xnew])
   }
-  #randomly sample test set
-  indrand<-sample(1:20, 5)
-  #get performance of random test set
-  perfrand<-sum((f.bar.star[indrand]-target[indrand])^2)
-  
-  #sample randomly from observed set, this is like proportional sampling
-  indprop<-sample(datobserve$x, 5)
-  #initialize performance vector
-  perf<-rep(0, 5)
-  #loop through (i know this is computationally lame...)
-  for (k in 1:5){
-    #get performance of proportional tes set
-    perf[k]<-(f.bar.star[indprop[k]==x.star]-target[indprop[k]==x.star])^2
-  }
-  perfprop<-sum(perf)
-  #concatenate performance and rank data frames
-  dperformance<-rbind(dperformance, data.frame(run=rep(nrun, 2), sampling=c("Random", "Proportional"), performance=c(perfrand, perfprop)))
-  #track ranks
   drank<-rbind(drank, data.frame(run=nrun, ranks=mean(trackrank)))
   cat(paste("Run", nrun, "is done.\n"))
 }
 drankcomplex<-drank
 dperfcomplex<-dperformance
 
-
-
+##########################################################################
+#DENSITY HISTOGRAMS OF SAMPLED MEAN RANKS
+##########################################################################
 #plot for complexity heuristic
 p1<-ggplot(drankcomplex, aes(x=ranks)) + 
   #histogram
