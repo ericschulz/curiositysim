@@ -45,7 +45,8 @@ tau<-0.001 #softmax tau
 
 
 ##########################################################################
-#SIMULATION FOR COMPLEXITY APPROXIMATION
+#SIMULATION FOR COMPLEXITY APPROXIMATION 
+#Warning: takes about 15 - 30 minutes to run
 ##########################################################################
 drankcomplex<-data.frame(run=1:nruns, ranks=rep(0, nruns)) #initialize data frame to collect which options are chosen during learning
 #Let's get the party started 
@@ -181,20 +182,20 @@ saveRDS(drankucb, 'data/ucbHeuristic.Rds') #Save data
 #plot for complexity heuristic
 p1<-ggplot(drankcomplex, aes(x=ranks)) + 
   geom_histogram(fill="#7bc5e0")+xlim(c(1,5))+theme_classic()+scale_y_continuous(expand = c(0,0))+ #histogram
-  theme(text = element_text(size=25,  family="calibri"))+xlab("Confidence Rank")+ylab("Counts")+ggtitle("Complexity Approximation") #style
+  theme(text = element_text(size=25))+xlab("Confidence Rank")+ylab("Counts")+ggtitle("Complexity Approximation") #style
 p1
 
 #plot for novelty heuristic
 p2<-ggplot(dranknovel, aes(x=ranks)) + 
   geom_histogram(fill="#0270bb")+xlim(c(1,5))+theme_classic()+scale_y_continuous(expand = c(0,0))+ #histogram
-  theme(text = element_text(size=25,  family="calibri"))+xlab("Confidence Rank")+ylab("Counts")+ggtitle("Novelty Approximation") #styles
+  theme(text = element_text(size=25))+xlab("Confidence Rank")+ylab("Counts")+ggtitle("Novelty Approximation") #styles
 p2
 
 
 #plot for ucb
 p3<-ggplot(drankucb, aes(x=ranks)) + 
   geom_histogram(fill="purple")+xlim(c(0,20))+theme_classic()+scale_y_continuous(expand = c(0,0))+ #histogram
-  theme(text = element_text(size=25,  family="calibri"))+xlab("Confidence Rank")+ylab("Counts")+ggtitle("Upper Confidence Bounds") #histogram
+  theme(text = element_text(size=25))+xlab("Confidence Rank")+ylab("Counts")+ggtitle("Upper Confidence Bounds") #histogram
 p3
 
 #save all plots:
