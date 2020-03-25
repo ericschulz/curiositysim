@@ -44,6 +44,47 @@ beta<-3 #UCB exploration bonus
 tau<-0.001 #softmax tau
 
 
+
+##########################################################################
+#SIMULATION FOR NOVELTY HEURISTIC
+##########################################################################
+dranknovel<-data.frame(run=1:nruns, ranks=rep(0, nruns)) #initialize data frame to collect which options are chosen during learning
+
+#Let's get the party started
+for (nrun in 1:nruns){ #loop through runs (i.e., replications)
+  #Generate the function we are trying to optimize
+  target<-mvrnorm(1, rep(0, length(x.star)), sigma) #we sample a target function from the GP with mean function 0. 
+  xnew<-sample(x.star)[1] #first observation is randomly sampled
+  ynew<-target[x.star==xnew]+rnorm(1, 0, sigma.n) #output for sampled option, with added gaussian noise
+  datobserve<-data.frame(x=xnew, y=ynew) #initialize the data frame to track the actual observations
+  trackrank<-rep(0, ntrials) #initialize vector to track sampled confidence rank
+  #for 10 trials in total, we'll be sampling!
+  for (trials in 1:ntrials){
+    #GP inference
+    x <- datobserve$x #x observations for GP
+    k.xx <- calcSigma(x,x) #calculate the kernel matrix for all pairwise combinations of observed data points (x)
+    k.xxs <- calcSigma(x,x.star) #calculate the kernel matrix for all pairwise combinations of observed data points (x) and the points we want to make predictions about (x.star)
+    k.xsx <- calcSigma(x.star,x) #Same as above, but the other way around
+    k.xsxs <- calcSigma(x.star,x.star) #calculate the kernel matrix for all pairwise combinations of points we want to make predictions about (x.star)
+    f.bar.star <- k.xsx%*%solve(k.xx + sigma.n^2*diag(1, ncol(k.xx)))%*%datobserve$y #posterior mean of the GP
+    cov.f.star <- k.xsxs - k.xsx%*%solve(k.xx + sigma.n^2*diag(1, ncol(k.xx)))%*%k.xxs #posterior covariance matrix of the GP
+    sig<-sqrt(diag(cov.f.star)) #get predictive standard deviations
+    #Figure out which stimuli sample
+    util<-sig-max(sig) #compute utilities based on the predictive standard deviations. Here, we subtract max to avoid overflow in the softmax function, without affecting the final choice probabilitie
+    prob<-exp(util/tau)/sum(exp(util/tau)) #softmax of probabilities
+    xnew<-sample(x.star, 1, prob=prob) #sample a new observation proportionally to the softmax probs
+    #Acquire new observations
+    ynew<-target[x.star==xnew]+rnorm(1, 0, sigma.n) #get an ouptut plus observation noise
+    datobserve<-rbind(datobserve, data.frame(x=xnew, y=ynew)) #concatenate the new observations to the old ones
+    trackrank[trials]<-rank(-diag(cov.f.star), ties.method = "min")[x.star==xnew] #collect the tracked confidence ranks, we want less confidence to have lower ranks and we also break ties randomly
+  }
+  #Update
+  dranknovel$ranks[nrun]<-mean(trackrank)
+  cat(paste("Run", nrun, "is done.\n"))
+}
+
+saveRDS(dranknovel, 'data/noveltyHeuristic.Rds') #Save data
+
 ##########################################################################
 #SIMULATION FOR COMPLEXITY APPROXIMATION 
 #Warning: takes about 15 - 30 minutes to run
@@ -97,45 +138,6 @@ for (nrun in 1:nruns){
 
 saveRDS(drankcomplex, 'data/complexityHeuristic.Rds') #Save data
 
-##########################################################################
-#SIMULATION FOR NOVELTY HEURISTIC
-##########################################################################
-dranknovel<-data.frame(run=1:nruns, ranks=rep(0, nruns)) #initialize data frame to collect which options are chosen during learning
-
-#Let's get the party started
-for (nrun in 1:nruns){ #loop through runs (i.e., replications)
-  #Generate the function we are trying to optimize
-  target<-mvrnorm(1, rep(0, length(x.star)), sigma) #we sample a target function from the GP with mean function 0. 
-  xnew<-sample(x.star)[1] #first observation is randomly sampled
-  ynew<-target[x.star==xnew]+rnorm(1, 0, sigma.n) #output for sampled option, with added gaussian noise
-  datobserve<-data.frame(x=xnew, y=ynew) #initialize the data frame to track the actual observations
-  trackrank<-rep(0, ntrials) #initialize vector to track sampled confidence rank
-  #for 10 trials in total, we'll be sampling!
-  for (trials in 1:ntrials){
-    #GP inference
-    x <- datobserve$x #x observations for GP
-    k.xx <- calcSigma(x,x) #calculate the kernel matrix for all pairwise combinations of observed data points (x)
-    k.xxs <- calcSigma(x,x.star) #calculate the kernel matrix for all pairwise combinations of observed data points (x) and the points we want to make predictions about (x.star)
-    k.xsx <- calcSigma(x.star,x) #Same as above, but the other way around
-    k.xsxs <- calcSigma(x.star,x.star) #calculate the kernel matrix for all pairwise combinations of points we want to make predictions about (x.star)
-    f.bar.star <- k.xsx%*%solve(k.xx + sigma.n^2*diag(1, ncol(k.xx)))%*%datobserve$y #posterior mean of the GP
-    cov.f.star <- k.xsxs - k.xsx%*%solve(k.xx + sigma.n^2*diag(1, ncol(k.xx)))%*%k.xxs #posterior covariance matrix of the GP
-    sig<-sqrt(diag(cov.f.star)) #get predictive standard deviations
-    #Figure out which stimuli sample
-    util<-sig-max(sig) #compute utilities based on the predictive standard deviations. Here, we subtract max to avoid overflow in the softmax function, without affecting the final choice probabilitie
-    prob<-exp(util/tau)/sum(exp(util/tau)) #softmax of probabilities
-    xnew<-sample(x.star, 1, prob=prob) #sample a new observation proportionally to the softmax probs
-    #Acquire new observations
-    ynew<-target[x.star==xnew]+rnorm(1, 0, sigma.n) #get an ouptut plus observation noise
-    datobserve<-rbind(datobserve, data.frame(x=xnew, y=ynew)) #concatenate the new observations to the old ones
-    trackrank[trials]<-rank(-diag(cov.f.star), ties.method = "min")[x.star==xnew] #collect the tracked confidence ranks, we want less confidence to have lower ranks and we also break ties randomly
-  }
-  #Update
-  dranknovel$ranks[nrun]<-mean(trackrank)
-  cat(paste("Run", nrun, "is done.\n"))
-}
-
-saveRDS(dranknovel, 'data/noveltyHeuristic.Rds') #Save data
 
 ##########################################################################
 #SIMULATION FOR UPPER CONFIDENCE BOUND SAMPLER
@@ -179,17 +181,20 @@ saveRDS(drankucb, 'data/ucbHeuristic.Rds') #Save data
 ##########################################################################
 #DENSITY HISTOGRAMS OF SAMPLED MEAN RANKS
 ##########################################################################
-#plot for complexity heuristic
-p1<-ggplot(drankcomplex, aes(x=ranks)) + 
-  geom_histogram(fill="#7bc5e0")+xlim(c(1,5))+theme_classic()+scale_y_continuous(expand = c(0,0))+ #histogram
-  theme(text = element_text(size=25))+xlab("Confidence Rank")+ylab("Counts")+ggtitle("Complexity Approximation") #style
-p1
 
 #plot for novelty heuristic
-p2<-ggplot(dranknovel, aes(x=ranks)) + 
+p1<-ggplot(dranknovel, aes(x=ranks)) + 
   geom_histogram(fill="#0270bb")+xlim(c(1,5))+theme_classic()+scale_y_continuous(expand = c(0,0))+ #histogram
   theme(text = element_text(size=25))+xlab("Confidence Rank")+ylab("Counts")+ggtitle("Novelty Approximation") #styles
+p1
+
+
+#plot for complexity heuristic
+p2<-ggplot(drankcomplex, aes(x=ranks)) + 
+  geom_histogram(fill="#7bc5e0")+xlim(c(1,5))+theme_classic()+scale_y_continuous(expand = c(0,0))+ #histogram
+  theme(text = element_text(size=25))+xlab("Confidence Rank")+ylab("Counts")+ggtitle("Complexity Approximation") #style
 p2
+
 
 
 #plot for ucb
@@ -199,11 +204,11 @@ p3<-ggplot(drankucb, aes(x=ranks)) +
 p3
 
 #save all plots:
-png("plots/Complexity.png", width=500, height=300)
+png("plots/Novelty.png", width=500, height=300)
 p1
 dev.off()
 
-png("plots/Novelty.png", width=500, height=300)
+png("plots/Complexity.png", width=500, height=300)
 p2
 dev.off()
 
