@@ -84,7 +84,7 @@ for (nrun in 1:nruns){ #loop through runs (i.e., replications)
 }
 
 saveRDS(dranknovel, 'data/noveltyHeuristic.Rds') #Save data
-
+dranknovel <- readRDS('data/noveltyHeuristic.Rds')
 ##########################################################################
 #SIMULATION FOR COMPLEXITY APPROXIMATION 
 #Warning: takes about 15 - 30 minutes to run
@@ -137,7 +137,7 @@ for (nrun in 1:nruns){
 }
 
 saveRDS(drankcomplex, 'data/complexityHeuristic.Rds') #Save data
-
+drankcomplex <- readRDS('data/complexityHeuristic.Rds')
 
 ##########################################################################
 #SIMULATION FOR UPPER CONFIDENCE BOUND SAMPLER
@@ -178,29 +178,39 @@ for (nrun in 1:nruns){ #loop through runs (i.e., replications)
 }
 
 saveRDS(drankucb, 'data/ucbHeuristic.Rds') #Save data
+drankucb <- readRDS('data/ucbHeuristic.Rds')
 ##########################################################################
 #DENSITY HISTOGRAMS OF SAMPLED MEAN RANKS
 ##########################################################################
 
 #plot for novelty heuristic
 p1<-ggplot(dranknovel, aes(x=ranks)) + 
-  geom_histogram(fill="#0270bb")+xlim(c(1,5))+theme_classic()+scale_y_continuous(expand = c(0,0))+ #histogram
-  theme(text = element_text(size=25))+xlab("Confidence Rank")+ylab("Counts")+ggtitle("Novelty Approximation") #styles
+ geom_histogram(aes(y=(..density..) * .1), binwidth = .1, fill="#0270bb", color = 'black')+
+  xlim(c(1,5))+
+  theme_classic()+
+  scale_y_continuous(labels = scales::percent_format(accuracy = 5L))+
+  theme(text = element_text(size=25))+xlab("Confidence Rank")+ylab("Probability")+ggtitle("Novelty Approximation") #styles
 p1
 
 
-#plot for complexity heuristic
+#plot for complexity heuristic 7bc5e0
 p2<-ggplot(drankcomplex, aes(x=ranks)) + 
-  geom_histogram(fill="#7bc5e0")+xlim(c(1,5))+theme_classic()+scale_y_continuous(expand = c(0,0))+ #histogram
-  theme(text = element_text(size=25))+xlab("Confidence Rank")+ylab("Counts")+ggtitle("Complexity Approximation") #style
+  geom_histogram(aes(y=(..density..) * .1), binwidth = .1, fill="#7bc5e0", color = 'black')+
+  xlim(c(1,5))+
+  theme_classic()+
+  scale_y_continuous(labels = scales::percent_format(accuracy = 5L))+
+  theme(text = element_text(size=25))+xlab("Confidence Rank")+ylab("Probability")+ggtitle("Complexity Approximation") #style
 p2
 
 
 
 #plot for ucb
 p3<-ggplot(drankucb, aes(x=ranks)) + 
-  geom_histogram(fill="purple")+xlim(c(0,20))+theme_classic()+scale_y_continuous(expand = c(0,0))+ #histogram
-  theme(text = element_text(size=25))+xlab("Confidence Rank")+ylab("Counts")+ggtitle("Upper Confidence Bounds") #histogram
+  geom_histogram(aes(y=(..density..) * .1), binwidth = .1, fill="purple", color = 'black')+
+  xlim(c(1,5))+
+  theme_classic()+
+  scale_y_continuous(labels = scales::percent_format(accuracy = 5L))+
+  theme(text = element_text(size=25))+xlab("Confidence Rank")+ylab("Probability")+ggtitle("Upper Confidence Bounds") #histogram
 p3
 
 #save all plots:
