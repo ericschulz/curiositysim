@@ -26,6 +26,7 @@ calcSigma <- function(X1,X2,l=1) {
   return(Sigma)
 }
 
+theme_set(theme_classic())
 ##########################################################################
 #PARAMETERS
 ##########################################################################
@@ -40,15 +41,15 @@ lambda<-1 #length scale
 sigma <- calcSigma(x.star,x.star, l = lambda) #pre-calculate Gram matrix of the rbf kernel
 
 #Sampling strategies
-beta<-3 #UCB exploration bonus
+beta<-2 #UCB exploration bonus
 tau<-0.001 #softmax tau
 
 
 
 ##########################################################################
-#SIMULATION FOR NOVELTY HEURISTIC
+#SIMULATION FOR UNCERTAINTY SAMPLING HEURISTIC
 ##########################################################################
-dranknovel<-data.frame(run=1:nruns, ranks=rep(0, nruns)) #initialize data frame to collect which options are chosen during learning
+drankUS<-data.frame(run=1:nruns, ranks=rep(0, nruns)) #initialize data frame to collect which options are chosen during learning
 
 #Let's get the party started
 for (nrun in 1:nruns){ #loop through runs (i.e., replications)
@@ -79,17 +80,17 @@ for (nrun in 1:nruns){ #loop through runs (i.e., replications)
     trackrank[trials]<-rank(-diag(cov.f.star), ties.method = "min")[x.star==xnew] #collect the tracked confidence ranks, we want less confidence to have lower ranks and we also break ties randomly
   }
   #Update
-  dranknovel$ranks[nrun]<-mean(trackrank)
+  drankUS$ranks[nrun]<-mean(trackrank)
   cat(paste("Run", nrun, "is done.\n"))
 }
 
-saveRDS(dranknovel, 'data/noveltyHeuristic.Rds') #Save data
-dranknovel <- readRDS('data/noveltyHeuristic.Rds')
+saveRDS(drankUS, 'data/uncertaintySampling.Rds') #Save data
+drankUS <- readRDS('data/uncertaintySampling.Rds')
 ##########################################################################
-#SIMULATION FOR COMPLEXITY APPROXIMATION 
+#SIMULATION FOR EXPECTED MODEL CHANGE
 #Warning: takes about 15 - 30 minutes to run
 ##########################################################################
-drankcomplex<-data.frame(run=1:nruns, ranks=rep(0, nruns)) #initialize data frame to collect which options are chosen during learning
+drankModelChange<-data.frame(run=1:nruns, ranks=rep(0, nruns)) #initialize data frame to collect which options are chosen during learning
 #Let's get the party started 
 for (nrun in 1:nruns){
   #Generate the function we are trying to optimize
@@ -132,12 +133,12 @@ for (nrun in 1:nruns){
     trackrank[trials]<-rank(-diag(cov.f.star), ties.method = "min")[x.star==xnew] #collect the tracked confidence ranks, we want less confidence to have lower ranks and we also break ties randomly
   }
   #update
-  drankcomplex$ranks[nrun]<-mean(trackrank)
+  drankModelChange$ranks[nrun]<-mean(trackrank)
   cat(paste("Run", nrun, "is done.\n"))
 }
 
-saveRDS(drankcomplex, 'data/complexityHeuristic.Rds') #Save data
-drankcomplex <- readRDS('data/complexityHeuristic.Rds')
+saveRDS(drankModelChange, 'data/modelChange.Rds') #Save data
+drankModelChange <- readRDS('data/modelChange.Rds')
 
 ##########################################################################
 #SIMULATION FOR UPPER CONFIDENCE BOUND SAMPLER
@@ -183,46 +184,37 @@ drankucb <- readRDS('data/ucbHeuristic.Rds')
 #DENSITY HISTOGRAMS OF SAMPLED MEAN RANKS
 ##########################################################################
 
-#plot for novelty heuristic
-p1<-ggplot(dranknovel, aes(x=ranks)) + 
- geom_histogram(aes(y=(..density..) * .1), binwidth = .1, fill="#0270bb", color = 'black')+
-  xlim(c(1,5))+
+#plot for uncertainty sampling
+p1<-ggplot(drankUS, aes(x=ranks)) + 
+ geom_histogram(aes(y=(..density..) * 0.1), binwidth = 0.1, fill="#0270bb", color = 'black')+
   theme_classic()+
-  scale_y_continuous(labels = scales::percent_format(accuracy = 5L))+
-  theme(text = element_text(size=25))+xlab("Confidence Rank")+ylab("Probability")+ggtitle("Novelty Approximation") #styles
+  #coord_cartesian(xlim=c(1,20))+
+  scale_y_continuous(labels = scales::percent_format(accuracy=1))+
+  xlab("Confidence Rank")+ylab("Probability")+ggtitle("Uncertainty Sampling") #styles
 p1
 
 
 #plot for complexity heuristic 7bc5e0
-p2<-ggplot(drankcomplex, aes(x=ranks)) + 
-  geom_histogram(aes(y=(..density..) * .1), binwidth = .1, fill="#7bc5e0", color = 'black')+
-  xlim(c(1,5))+
+p2<-ggplot(drankModelChange, aes(x=ranks)) + 
+  geom_histogram(aes(y=(..density..) * 0.1), binwidth = 0.1, fill="#7bc5e0", color = 'black')+
   theme_classic()+
-  scale_y_continuous(labels = scales::percent_format(accuracy = 5L))+
-  theme(text = element_text(size=25))+xlab("Confidence Rank")+ylab("Probability")+ggtitle("Complexity Approximation") #style
+  #coord_cartesian(xlim=c(1,20))+
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1))+
+  xlab("Confidence Rank")+ylab("Probability")+ggtitle("Expected Model Change") #style
 p2
-
 
 
 #plot for ucb
 p3<-ggplot(drankucb, aes(x=ranks)) + 
-  geom_histogram(aes(y=(..density..) * .1), binwidth = .1, fill="purple", color = 'black')+
-  xlim(c(1,5))+
+  geom_histogram(aes(y=(..density..) * 0.5), binwidth = 0.5, fill="purple", color = 'black')+
   theme_classic()+
-  scale_y_continuous(labels = scales::percent_format(accuracy = 5L))+
-  theme(text = element_text(size=25))+xlab("Confidence Rank")+ylab("Probability")+ggtitle("Upper Confidence Bounds") #histogram
+  #coord_cartesian(xlim=c(1,20))+
+  scale_y_continuous(labels = scales::percent_format(1))+
+  xlab("Confidence Rank")+ylab("Probability")+ggtitle("Upper Confidence Bounds") #histogram
 p3
 
-#save all plots:
-png("plots/Novelty.png", width=500, height=300)
-p1
-dev.off()
+#put the plots together
+p <- cowplot::plot_grid(p1,p2,p3, labels = 'AUTO', nrow = 1)
+p
 
-png("plots/Complexity.png", width=500, height=300)
-p2
-dev.off()
-
-png("plots/UCB.png", width=500, height=300)
-p3
-dev.off()
-#END
+ggsave('plots/sim.pdf', p, width = 10, height = 3, units = 'in')
